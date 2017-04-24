@@ -2,6 +2,7 @@ defmodule NewRelixir.Plug.Instrumentation do
   @moduledoc """
   Utility methods for instrumenting parts of an Elixir app.
   """
+  import NewRelixir.Utils
 
   @doc """
   Instruments a database call and records the elapsed time.
@@ -42,7 +43,7 @@ defmodule NewRelixir.Plug.Instrumentation do
   end
 
   defp infer_model(%{__struct__: model_type, __meta__: %Ecto.Schema.Metadata{}}) do
-    model_name(model_type)
+    short_module_name(model_type)
   end
   # Ecto 1.1 clause
   defp infer_model(%{model: model}) do
@@ -54,7 +55,7 @@ defmodule NewRelixir.Plug.Instrumentation do
   end
 
   defp infer_model(%Ecto.Query{from: {_, model_type}}) do
-    model_name(model_type)
+    short_module_name(model_type)
   end
 
   defp infer_model(%Ecto.Query{}) do
@@ -65,14 +66,10 @@ defmodule NewRelixir.Plug.Instrumentation do
     infer_model(Ecto.Queryable.to_query(queryable))
   end
 
-  defp model_name(model_type) do
-    model_type |> Module.split |> List.last
-  end
-
   defp record(opts, elapsed) do
-    if (conn = Keyword.get(opts, :conn)) && (transaction = Map.get(conn.private, :new_relixir_transaction)) do
-      NewRelixir.Transaction.record_db(transaction, get_query(opts), elapsed)
-    end
+    with {:ok, conn} <- Keyword.fetch(opts, :conn),
+         {:ok, transaction} <- Map.fetch(conn.private, :new_relixir_transaction),
+      do: NewRelixir.Transaction.record_db(transaction, get_query(opts), elapsed)
   end
 
   defp get_query(opts) do
